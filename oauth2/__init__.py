@@ -102,8 +102,8 @@ def to_unicode(s):
             raise TypeError('You are required to pass either unicode or string here, not: %r (%s)' % (type(s), s))
         try:
             s = s.decode('utf-8')
-        except UnicodeDecodeError, le:
-            raise TypeError('You are required to pass either a unicode object or a utf-8 string here. You passed a Python string object which contained non-utf-8: %r. The UnicodeDecodeError that resulted from attempting to interpret it as utf-8 was: %s' % (s, le,))
+        except UnicodeDecodeError:
+            raise TypeError('You are required to pass either a unicode object or a utf-8 string here. You passed a Python string object which contained non-utf-8: %r. The UnicodeDecodeError that resulted from attempting to interpret it as utf-8' % (s, ))
     return s
 
 def to_utf8(s):
@@ -131,8 +131,8 @@ def to_unicode_optional_iterator(x):
 
     try:
         l = list(x)
-    except TypeError, e:
-        assert 'is not iterable' in str(e)
+    except TypeError:
+        assert 'is not iterable' in str(TypeError)
         return x
     else:
         return [ to_unicode(e) for e in l ]
@@ -147,8 +147,8 @@ def to_utf8_optional_iterator(x):
 
     try:
         l = list(x)
-    except TypeError, e:
-        assert 'is not iterable' in str(e)
+    except TypeError:
+        assert 'is not iterable' in str(TypeError)
         return x
     else:
         return [ to_utf8_if_string(e) for e in l ]
@@ -174,11 +174,11 @@ def generate_verifier(length=8):
 
 class Consumer(object):
     """A consumer of OAuth-protected services.
- 
+
     The OAuth consumer is a "third-party" service that wants to access
     protected resources from an OAuth service provider on behalf of an end
     user. It's kind of the OAuth client.
- 
+
     Usually a consumer must be registered with the service provider by the
     developer of the consumer software. As part of that process, the service
     provider gives the consumer a *key* and a *secret* with which the consumer
@@ -186,7 +186,7 @@ class Consumer(object):
     key in each request to identify itself, but will use its secret only when
     signing requests, to prove that the request is from that particular
     registered consumer.
- 
+
     Once registered, the consumer can then use its consumer credentials to ask
     the service provider for a request token, kicking off the OAuth
     authorization process.
@@ -212,12 +212,12 @@ class Consumer(object):
 class Token(object):
     """An OAuth credential used to request authorization or a protected
     resource.
- 
+
     Tokens in OAuth comprise a *key* and a *secret*. The key is included in
     requests to identify the token being used, but the secret is used only in
     the signature, to prove that the requester is who the server gave the
     token to.
- 
+
     When first negotiating the authorization, the consumer asks for a *request
     token* that the live user authorizes with the service provider. The
     consumer then exchanges the request token for an *access token* that can
@@ -262,7 +262,7 @@ class Token(object):
 
     def to_string(self):
         """Returns this token as a plain string, suitable for storage.
- 
+
         The resulting string includes the token's secret, so you should never
         send or store this string where a third party can read it.
         """
@@ -275,7 +275,7 @@ class Token(object):
         if self.callback_confirmed is not None:
             data['oauth_callback_confirmed'] = self.callback_confirmed
         return urllib.urlencode(data)
- 
+
     @staticmethod
     def from_string(s):
         """Deserializes a token from a string like one returned by
@@ -296,7 +296,7 @@ class Token(object):
         try:
             secret = params['oauth_token_secret'][0]
         except Exception:
-            raise ValueError("'oauth_token_secret' not found in " 
+            raise ValueError("'oauth_token_secret' not found in "
                 "OAuth request.")
 
         token = Token(key, secret)
@@ -312,31 +312,31 @@ class Token(object):
 
 def setter(attr):
     name = attr.__name__
- 
+
     def getter(self):
         try:
             return self.__dict__[name]
         except KeyError:
             raise AttributeError(name)
- 
+
     def deleter(self):
         del self.__dict__[name]
- 
+
     return property(getter, attr, deleter)
 
 
 class Request(dict):
- 
+
     """The parameters and information for an HTTP request, suitable for
     authorizing with OAuth credentials.
- 
+
     When a consumer wants to access a service's protected resources, it does
     so using a signed HTTP request identifying itself (the consumer) with its
     key, and providing an access token authorized by the end user to access
     those resources.
- 
+
     """
- 
+
     version = OAUTH_VERSION
 
     def __init__(self, method=HTTP_METHOD, url=None, parameters=None,
@@ -372,33 +372,33 @@ class Request(dict):
         else:
             self.normalized_url = None
             self.__dict__['url'] = None
- 
+
     @setter
     def method(self, value):
         self.__dict__['method'] = value.upper()
- 
+
     def _get_timestamp_nonce(self):
         return self['oauth_timestamp'], self['oauth_nonce']
- 
+
     def get_nonoauth_parameters(self):
         """Get any non-OAuth parameters."""
-        return dict([(k, v) for k, v in self.iteritems() 
+        return dict([(k, v) for k, v in self.iteritems()
                     if not k.startswith('oauth_')])
- 
+
     def to_header(self, realm=''):
         """Serialize as a header for an HTTPAuth request."""
-        oauth_params = ((k, v) for k, v in self.items() 
+        oauth_params = ((k, v) for k, v in self.items()
                             if k.startswith('oauth_'))
         stringy_params = ((k, escape(str(v))) for k, v in oauth_params)
         header_params = ('%s="%s"' % (k, v) for k, v in stringy_params)
         params_header = ', '.join(header_params)
- 
+
         auth_header = 'OAuth realm="%s"' % realm
         if params_header:
             auth_header = "%s, %s" % (auth_header, params_header)
- 
+
         return {'Authorization': auth_header}
- 
+
     def to_postdata(self):
         """Serialize as post data for a POST request."""
         d = {}
@@ -409,7 +409,7 @@ class Request(dict):
         # to resulting querystring. for example self["k"] = ["v1", "v2"] will
         # result in 'k=v1&k=v2' and not k=%5B%27v1%27%2C+%27v2%27%5D
         return urllib.urlencode(d, True).replace('+', '%20')
- 
+
     def to_url(self):
         """Serialize as a URL for a GET request."""
         base_url = urlparse.urlparse(self.url)
@@ -421,7 +421,7 @@ class Request(dict):
         query = parse_qs(to_utf8(query))
         for k, v in self.items():
             query.setdefault(to_utf8(k), []).append(to_utf8_optional_iterator(v))
-        
+
         try:
             scheme = to_utf8(base_url.scheme)
             netloc = to_utf8(base_url.netloc)
@@ -460,8 +460,8 @@ class Request(dict):
             else:
                 try:
                     value = list(value)
-                except TypeError, e:
-                    assert 'is not iterable' in str(e)
+                except TypeError:
+                    assert 'is not iterable' in str(TypeError)
                     items.append((to_utf8_if_string(key), to_utf8_if_string(value)))
                 else:
                     items.extend((to_utf8_if_string(key), to_utf8_if_string(item)) for item in value)
